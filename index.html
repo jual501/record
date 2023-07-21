@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Voice to Text Translation</title>
+  <style>
+    .container {
+      text-align: center;
+    }
+
+    .text-area {
+      width: 400px;
+      height: 200px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Voice to Text Translation</h1>
+    <button id="recordButton">Start Recording</button>
+    <button id="stopButton" disabled>Stop Recording</button>
+    <div class="text-area">
+      <textarea id="resultTextarea" readonly></textarea>
+    </div>
+  </div>
+
+  <script>
+    // Variables for speech recognition
+    let recognition;
+    let isRecording = false;
+
+    // Variables for Google Cloud Speech-to-Text API
+    const apiKey = 'YOUR_API_KEY'; // Replace with your Google Cloud API key
+    const apiUrl = `https://speech.googleapis.com/v1p1beta1/speech:recognize?key=${apiKey}`;
+
+    // Button references
+    const recordButton = document.getElementById('recordButton');
+    const stopButton = document.getElementById('stopButton');
+
+    // Text area reference
+    const resultTextarea = document.getElementById('resultTextarea');
+
+    // Initialize speech recognition
+    function initializeRecognition() {
+      recognition = new window.webkitSpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = function() {
+        isRecording = true;
+        recordButton.disabled = true;
+        stopButton.disabled = false;
+        resultTextarea.value = 'Recording...';
+      };
+
+      recognition.onerror = function(event) {
+        console.error('Error occurred in recognition: ' + event.error);
+        stopRecording();
+      };
+
+      recognition.onend = function() {
+        if (isRecording) {
+          stopRecording();
+        }
+      };
+
+      recognition.onresult = function(event) {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        resultTextarea.value = finalTranscript;
+      };
+    }
+
+    // Start recording
+    function startRecording() {
+      recognition.start();
+    }
+
+    // Stop recording
+    function stopRecording() {
+      isRecording = false;
+      recognition.stop();
+      recordButton.disabled = false;
+      stopButton.disabled = true;
+      resultTextarea.value += '\nRecording stopped.';
+      translateText();
+    }
+
+    // Translate text using Google Cloud Speech-to-Text API
+    function translateText() {
+      const textToTranslate = resultTextarea.value;
+      const request = {
+        audio: {
+          content: textToTranslate
+        },
+        config: {
+          encoding: 'LINEAR16',
+          sampleRateHertz: 44100,
+          languageCode: 'en-US'
+        }
+      };
+
+      fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
+      })
+        .then(response => response.json())
+        .then(data => {
+          const translatedText = data.results[0].alternatives[0].transcript;
+          resultTextarea.value += '\nTranslation: ' + translatedText;
+        })
+        .catch(error => {
+          console.error('Error translating text:', error);
+        });
+    }
+
+    // Event listeners for buttons
+    recordButton.addEventListener('click', () => {
+      startRecording();
+    });
+
+    stopButton.addEventListener('click', () => {
+      stopRecording();
+    });
+
+    // Initialize speech recognition on page load
+    window.addEventListener('load', () => {
+      initializeRecognition();
+    });
+  </script>
+</body>
+</html>
